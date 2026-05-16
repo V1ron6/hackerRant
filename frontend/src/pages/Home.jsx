@@ -4,6 +4,7 @@ import {Mail} from 'lucide-react'
 const Home = () => {
 	return (
 		<div>home</div>
+		
 	)
 }
 
