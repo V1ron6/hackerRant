@@ -1,16 +1,29 @@
-import express from 'express'
-import cors from 'cors'
-import 'dotenv/config'
+require('dotenv').config();
 
-const app = express();
-const port =process.env.PORT
+const http    = require('http');
+const app     = require('./app');
+const { init: initSockets } = require('./src/sockets');
+const { sequelize } = require('./src/models');
 
+const PORT = process.env.PORT || 5000;
 
-app.get("/",(req,res)=>{
- res.send("--- Hades ---")
-})
+const server = http.createServer(app);
 
+initSockets(server);
 
-app.listen(port,()=>{
-    console.log(`[running] on port ${port}`) 
-})
+(async () => {
+  try {
+    await sequelize.authenticate();
+    console.log('DB connected');
+
+    await sequelize.sync({ alter: false });
+    console.log('Models synced');
+
+    server.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+    });
+  } catch (err) {
+    console.error('Startup error:', err);
+    process.exit(1);
+  }
+})();
