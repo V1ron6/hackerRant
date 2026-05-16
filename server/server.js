@@ -7,11 +7,10 @@ const port =process.env.PORT
 
 
 app.get("/",(req,res)=>{
- res.send("hello")
+ res.send("--- Hades ---")
 })
 
+
 app.listen(port,()=>{
-
-console.log(`[running] on port ${port}`) 
-
+    console.log(`[running] on port ${port}`) 
 })
