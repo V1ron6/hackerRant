@@ -1,7 +1,7 @@
 
 const LoadingScreen = ({ message = "Loading", submessage = "Please wait..." }) => {
 	return (
-		<div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+		<div className="min-h-screen bg-linear-to-br from-gray-50 to-gray-100 flex items-center justify-center">
 			<div className="text-center">
 				{/* Minimalistic Loading Spinner */}
 				<div className="mb-8">
@@ -18,7 +18,7 @@ const LoadingScreen = ({ message = "Loading", submessage = "Please wait..." }) =
 				{/* Animated Dots */}
 				<div className="mt-6 flex justify-center gap-2">
 					<div className="w-2 h-2 bg-black rounded-full animate-bounce" style={{animationDelay: '0s'}}></div>
-					<div className="w-2 h-2 bg-grey-500 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+					<div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
 					<div className="w-2 h-2 bg-red-500 rounded-full animate-bounce" style={{animationDelay: '0.4s'}}></div>
 				</div>
 			</div>

@@ -1,14 +1,51 @@
 @import "tailwindcss";
 @font-face {
   font-family: "Baloo2";
-  src: url(./src/assets/fonts/Baloo2-VariableFont_wght.ttf);
+  src: url("./assets/fonts/Baloo2-VariableFont_wght.ttf") format("truetype");
+  font-display: swap;
 }
 
+@font-face {
+  font-family: "Roboto";
+  src: url("./assets/fonts/Roboto-VariableFont_wdth,wght.ttf") format("truetype");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Roboto";
+  font-style: italic;
+  src: url("./assets/fonts/Roboto-Italic-VariableFont_wdth,wght.ttf") format("truetype");
+  font-display: swap;
+}
+
+html,
+body {
+  font-family: "Roboto", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+@font-face {
+  font-family: "Roboto";
+  src: url(./assets/fonts/Roboto-VariableFont_wdth\,wght.ttf);
+}
+
+@font-face {
+  font-family: "Roboto";
+  font-style: italic;
+  src: url(./assets/fonts/Roboto-Italic-VariableFont_wdth\,wght.ttf);
+}
+
+html,
+body {
+  font-family: "Roboto", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+*{
+  font-family: "Baloo2",sans-serif;
+}
 .logoColor {
   color: rgb(235, 156, 156);
 }
 .bgImage {
-  background: url(./src/assets/offShoreLogo.jpg);
+  background: none;
 }
 .prefFont {
   font-family: "Baloo2", sans-serif;
@@ -413,16 +450,19 @@
 
 /* Focus visible styles */
 .focus-ring {
-  @apply focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2;
+  outline: none;
+  box-shadow: 0 0 0 2px rgb(239 68 68 / 0.9), 0 0 0 4px rgb(255 255 255 / 0.9);
 }
 
 .focus-ring-inset {
-  @apply focus:outline-none focus:ring-2 focus:ring-inset focus:ring-red-500;
+  outline: none;
+  box-shadow: inset 0 0 0 2px rgb(239 68 68 / 0.9);
 }
 
 /* Line clamp utilities */
 .line-clamp-1 {
   display: -webkit-box;
+  line-clamp: 1;
   -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;
   overflow: hidden;
@@ -430,6 +470,7 @@
 
 .line-clamp-2 {
   display: -webkit-box;
+  line-clamp: 2;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
@@ -437,6 +478,7 @@
 
 .line-clamp-3 {
   display: -webkit-box;
+  line-clamp: 3;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
