@@ -1,0 +1,72 @@
+hackerRant 
+its a realtime application
+
+security, Whatsapp like , when you register a security key is generated which is stored on your machine, now this key is bound to only your IP address or the IP address of the phone used to register, the ticket after registration automatically expire after 90 days of being issued and a new one is sent to the user automatically while the old one is discarded and blacklisted. if by any change you misplaced your phone or got a new phone, you would have to request for a new key( after requesting a link will be sent to your email and a code will be sent to your device, the pin expires after 20mins so does the link)
+
+
+login
+register
+Home(few info about the site,link to register)
+‎___________
+‎.status(users post(short videos, images,text,music))
+‎
+‎chat(chat session for the user and another user)
+‎
+‎Chat home(shows all chat and in an organization manner and gives the user opportunity to create a new chat(with other users)
+‎
+‎profile-(user info(r/w)- username, picture, about/bio)
+‎
+‎Chat profile(person being chatted(r-can only view their profile) - (username, picture, about/bio))
+‎
+‎threads[((create thread-(ask generate questions)) (view or reply to thread)), like a credit community]
+‎
+‎rantFinder(show you available users you might know based on your location and users you are already friends with, you can also search for users based on their username)
+‎
+‎Ranres(a page dedicated to free resources, like (link to tutorials, cheat sheets, docs, google drive files, etc))
+‎
+‎complains-(user side)
+‎____________
+‎setting
+‎.    |notification 
+‎.    | chat theme
+‎.    |profile_settings
+‎.    |danger 
+‎.          | delete account 
+‎.          | change_ticket(the new ticket will still be bound to the old ip)     
+‎.          |request_newticket(the new ticket will still be bound to the old ip)
+‎.     | logout (only closes the session but your previous location is stored)
+‎
+‎props,  feat,perm:
+‎.  push notifications available 
+‎.  email notification available 
+‎.  camera access
+‎.  contact access 
+‎.  storage access
+‎.  network access
+‎
+‎
+‎login- mechanism 
+‎once your account has been registered, your ticket will automatically be used.  if you visit the site's base url (hackerrant.vercel.app) if you have the ticket stored in your browser it will automatically validate and direct you to the chatHome for you to continue your activities else you are redirected to the website's home page from where you can create an account (register)
+‎
+‎register-mechanism
+‎After you have been directed to the register page, you will then be asked to provide your username, first_name,last_name,email, phone_number,dateOfBirth.
+‎under the hood the website will automatically check if you have a vpn on or not, if vpn prompt (user to disable it then gets their real ipaddr)else get ipaddr.
+‎. then an otp is sent to your number and email which would be used to verify your identity.
+‎
+‎at the bottom of the form there is a link there for linking a new device to an old account (that's where the security feature at the beginning of the page kicks in)
+            eight deadly sins( security middlewave wares.- top 8 sins: 7 from the seven deadly sins movie and the aggressor ) :
+‎
+‎1.add a security middlewave, named aggressor(what It does is it automatically verifies the ticket the user has provided with the one stored on the  database, every 5 mins) and shows on the user screen, bottom left corner,(like a floating robot icon that turns red when verifying and green if the ticket has been verified)
+‎while the aggressor is running it doesn't affect the users action or what ever they are doing. it only interrupts when the ticket is false or invalid .
+‎
+2. nother security middlewave,escanor: this function automatically suspends any account that has requested for a ticket change or ticket reset more than twice in a month.
+
+... [finish the remaining functions and what they do corresponding to the sin they represent.]
+make it immune to sqli , csrf , xss - reflected, xss- stored , you know all possible vulnerability and attacks 
+
+
+
+
+instruction 
+
+good now read the README.md and API_DOCS.md one last time and make a detailed list of the functions and pages you are going to add and how you will be going about it, don't forget to document everything stepby step and read buildi.txt formore contextual information remember you are a senoir frontend developer with 10years of experience at google,meta and facebook
