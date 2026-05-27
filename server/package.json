@@ -12,6 +12,7 @@
     "worker": "node  src/jobs/email.worker.js"
   },
   "dependencies": {
+    "@socket.io/redis-adapter": "^8.3.0",
     "bcryptjs": "^3.0.3",
     "bullmq": "^5.77.3",
     "compression": "^1.8.1",

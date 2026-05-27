@@ -3,7 +3,7 @@ its a realtime application
 
 security, Whatsapp like , when you register a security key is generated which is stored on your machine, now this key is bound to only your IP address or the IP address of the phone used to register, the ticket after registration automatically expire after 90 days of being issued and a new one is sent to the user automatically while the old one is discarded and blacklisted. if by any change you misplaced your phone or got a new phone, you would have to request for a new key( after requesting a link will be sent to your email and a code will be sent to your device, the pin expires after 20mins so does the link)
 
-
+ always make use of ui components if you need oneand its  not available create It
 login 
    when an account is already create with  a device the ticket is store safely on the machine, which isthen used automatically to verify theusers identitly
    for example if someone visits the website's base url / and there is a ticket on thepersions device which is valid instead of being directed to thelanding page the site automaticaaly verifies the identity and sends the persion to his interface , exactly like how Whatsapp work
