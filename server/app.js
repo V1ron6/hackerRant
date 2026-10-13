@@ -36,7 +36,7 @@ app.use(
 
 // ─── Body / cookies ───────────────────────────────────────────────────────────
 app.use(express.json({ limit: '10kb' }));
-app.use(express.urlencoded({ extended: true }));
+app.use(express.urlencoded({ extended: true, limit: '10kb', parameterLimit: 100 }));
 app.use(cookieParser(process.env.COOKIE_SECRET));
 
 // ─── Logging ──────────────────────────────────────────────────────────────────
@@ -57,8 +57,25 @@ app.use((req, res) => {
 
 // ─── Global error handler ─────────────────────────────────────────────────────
 app.use((err, req, res, next) => {
-  console.error(err);
-  res.status(err.status || 500).json({ error: err.message || 'Internal server error' });
+  // Keep diagnostic details in server logs; never expose stack traces or internal
+  // database/provider messages to clients in production.
+  console.error('[api-error]', {
+    method: req.method,
+    path: req.originalUrl,
+    status: err.status || 500,
+    message: err.message,
+  });
+
+  if (res.headersSent) return next(err);
+
+  const status = Number.isInteger(err.status) && err.status >= 400 && err.status < 600
+    ? err.status
+    : 500;
+  const message = status >= 500
+    ? 'Internal server error'
+    : (err.publicMessage || err.message || 'Request failed');
+
+  res.status(status).json({ error: message });
 });
 
 module.exports = app;

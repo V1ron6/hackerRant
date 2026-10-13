@@ -3,7 +3,8 @@
  * Handles all HTTP requests to the backend API with CSRF support
  */
 
-const API_BASE = import.meta.env?.VITE_API_URL || 'https://your-backend.onrender.com/api';
+const configuredApiBase = import.meta.env?.VITE_API_URL || import.meta.env?.VITE_API_BASE_URL;
+const API_BASE = (configuredApiBase || 'http://localhost:4000/api').replace(/\/+$/, '');
 
 let csrfToken = null;
 
@@ -62,12 +63,21 @@ const apiCall = async (endpoint, options = {}) => {
     config.body = JSON.stringify(body);
   }
 
-  const response = await fetch(`${API_BASE}${endpoint}`, config);
+  let response;
+  try {
+    response = await fetch(`${API_BASE}${endpoint}`, config);
+  } catch {
+    throw { status: 0, error: 'Unable to reach the server. Check the connection and API URL, then try again.' };
+  }
 
   let data = null;
   const contentType = response.headers.get('content-type') || '';
   if (contentType.includes('application/json')) {
-    data = await response.json();
+    try {
+      data = await response.json();
+    } catch {
+      data = null;
+    }
   }
 
   if (!response.ok) {
@@ -151,7 +161,7 @@ export const userService = {
    * Get public user profile
    */
   getProfile: (username) => {
-    return apiCall(`/users/${username}`);
+    return apiCall(`/users/${encodeURIComponent(username)}`);
   },
 
   /**
@@ -184,7 +194,7 @@ export const sessionService = {
    * Revoke a specific session
    */
   revokeSession: (sessionId) => {
-    return apiCall(`/sessions/${sessionId}`, {
+    return apiCall(`/sessions/${encodeURIComponent(sessionId)}`, {
       method: 'DELETE',
     });
   },

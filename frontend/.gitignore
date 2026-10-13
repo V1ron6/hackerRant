@@ -22,3 +22,4 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+\n# Environment variables (never commit secrets)\n.env\n.env.*\n!.env.example\n
