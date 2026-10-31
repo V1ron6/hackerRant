@@ -24,6 +24,14 @@ const getCsrfToken = () => {
 };
 
 /**
+ * Store the CSRF token returned by GET /auth/me. The hr_csrf cookie is set by
+ * the API origin, so JS on a different frontend origin (Vercel) can't read it.
+ */
+const setCsrfToken = (token) => {
+  csrfToken = token || null;
+};
+
+/**
  * Clear cached CSRF token (after logout or error)
  */
 const clearCsrfCache = () => {
@@ -81,6 +89,20 @@ const apiCall = async (endpoint, options = {}) => {
   }
 
   if (!response.ok) {
+    // CSRF tokens expire after 1h (or rotate when another device calls /auth/me):
+    // fetch a fresh one and retry the request once.
+    if (
+      response.status === 403 &&
+      !skipCsrf &&
+      !options._retried &&
+      typeof data?.error === 'string' &&
+      data.error.startsWith('MERLIN')
+    ) {
+      clearCsrfCache();
+      await authService.getMe();
+      return apiCall(endpoint, { ...options, _retried: true });
+    }
+
     throw {
       status: response.status,
       ...(data || {}),
@@ -146,8 +168,10 @@ export const authService = {
    * GET /auth/me
    * Get current authenticated user profile
    */
-  getMe: () => {
-    return apiCall('/auth/me');
+  getMe: async () => {
+    const res = await apiCall('/auth/me');
+    if (res?.data?.csrfToken) setCsrfToken(res.data.csrfToken);
+    return res;
   },
 };
 
@@ -212,6 +236,35 @@ export const sessionService = {
 };
 
 /**
+ * ============ CHAT ENDPOINTS ============
+ */
+
+export const chatService = {
+  /** GET /chats — my chats with last message + unread count */
+  list: () => apiCall('/chats'),
+
+  /** POST /chats — start (or fetch the existing) DM with a username */
+  create: (username) => apiCall('/chats', { method: 'POST', body: { username } }),
+
+  /** GET /chats/:chatId/messages — newest page; pass `cursor` for older */
+  messages: (chatId, { cursor, limit } = {}) => {
+    const q = new URLSearchParams();
+    if (cursor) q.set('cursor', cursor);
+    if (limit) q.set('limit', String(limit));
+    const qs = q.toString();
+    return apiCall(`/chats/${encodeURIComponent(chatId)}/messages${qs ? `?${qs}` : ''}`);
+  },
+
+  /** POST /chats/:chatId/messages — REST fallback when the socket is down */
+  send: (chatId, text) =>
+    apiCall(`/chats/${encodeURIComponent(chatId)}/messages`, { method: 'POST', body: { text } }),
+
+  /** POST /chats/:chatId/read */
+  markRead: (chatId) =>
+    apiCall(`/chats/${encodeURIComponent(chatId)}/read`, { method: 'POST', body: {} }),
+};
+
+/**
  * Utility to handle API errors
  */
 export const getErrorMessage = (error) => {
@@ -224,4 +277,4 @@ export const getErrorMessage = (error) => {
   return 'An error occurred. Please try again.';
 };
 
-export { API_BASE, getCsrfToken, clearCsrfCache };
+export { API_BASE, getCsrfToken, setCsrfToken, clearCsrfCache };

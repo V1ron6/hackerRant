@@ -83,7 +83,7 @@ const AggressorWidget = () => {
         <div className="text-xs">
           <div className="font-semibold text-gray-900">Aggressor</div>
           <div className="text-gray-500">
-            {status === 'verifying' ? 'verifying ticket…' : status === 'verified' ? 'ticket verified' : 'ticket invalid'}
+            {status === 'verifying' ? 'verifying ticket…' : status === 'verified' ? 'ticket verified' : status === 'idle' ? 'standing by' : 'ticket invalid'}
             {lastCheckedAt ? ` • ${new Date(lastCheckedAt).toLocaleTimeString()}` : ''}
           </div>
         </div>

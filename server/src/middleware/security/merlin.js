@@ -15,6 +15,10 @@ exports.generateToken = async (req, res, next) => {
     // Store in Redis keyed by user ID
     await redis.set(`csrf:${sessionId}`, token, 'EX', TOKEN_TTL);
 
+    // The cookie is set by the API origin, so JS on a different frontend
+    // origin (Vercel) cannot read it. Expose the token to the handler too.
+    res.locals.csrfToken = token;
+
     // Send token in a readable (non-httpOnly) cookie so the client JS can read it
     res.cookie('hr_csrf', token, {
       httpOnly: false,

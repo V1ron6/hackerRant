@@ -76,5 +76,5 @@ exports.logout = async (req, res, next) => {
 // GET /api/auth/me
 exports.me = async (req, res) => {
   const { password_hash, ...user } = req.user.toJSON();
-  return ok(res, user);
+  return ok(res, { ...user, csrfToken: res.locals.csrfToken });
 };

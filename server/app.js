@@ -9,6 +9,10 @@ const routes = require('./src/routes');
 
 const app = express();
 
+// Behind Render's proxy: without this req.ip is the proxy's address, which
+// breaks fingerprints, session IPs and the per-IP rate limiter.
+app.set('trust proxy', 1);
+
 // ─── Security headers ─────────────────────────────────────────────────────────
 app.use(
   helmet({

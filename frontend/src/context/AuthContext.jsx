@@ -5,6 +5,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { authService } from '../services/api';
+import { closeSocket } from '../services/socket';
 
 const AuthContext = createContext(null);
 
@@ -33,6 +34,7 @@ export const AuthProvider = ({ children }) => {
     try {
       await authService.logout();
     } finally {
+      closeSocket();
       setUser(null);
     }
   }, []);
