@@ -75,7 +75,7 @@ hackerrant/
 ### Backend
 
 ```bash
-npm install express mysql2 sequelize dotenv bcryptjs jsonwebtoken \
+npm install express pg pg-hstore sequelize dotenv bcryptjs jsonwebtoken \
   uuid helmet cors express-rate-limit cookie-parser \
   socket.io socket.io-redis redis \
   nodemailer twilio xss validator express-validator \
@@ -98,7 +98,7 @@ Express API + Socket.io — Render
     ↓
 Redis — Upstash
     ↓
-MySQL — PlanetScale
+Postgres — Neon
 ```
 
 ---
@@ -604,7 +604,7 @@ Users can:
 |---|---|
 | Frontend | Vercel |
 | Backend | Render |
-| Database | PlanetScale / MySQL |
+| Database | Neon (Postgres) |
 | Redis | Upstash |
 | Storage | Cloudflare R2 / AWS S3 |
 
