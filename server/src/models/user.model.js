@@ -28,6 +28,14 @@ const User = sequelize.define('User', {
     type:      DataTypes.STRING(255),
     allowNull: false,
   },
+  // Set once the registration OTP is verified. Login is refused until then.
+  // (New column: a database created from an earlier version needs
+  //  ALTER TABLE users ADD COLUMN email_verified BOOLEAN NOT NULL DEFAULT false;)
+  email_verified: {
+    type:         DataTypes.BOOLEAN,
+    allowNull:    false,
+    defaultValue: false,
+  },
   dob:        DataTypes.DATEONLY,
   bio:        DataTypes.TEXT,
   avatar_url: DataTypes.STRING(300),

@@ -52,12 +52,16 @@ const Chat = () => {
   };
 
   return (
-    <div className="mx-auto flex h-[calc(100vh-220px)] min-h-[420px] max-w-2xl flex-col">
+    <div className="mx-auto flex h-[calc(100dvh-250px)] min-h-[320px] min-[850px]:h-[calc(100dvh-220px)] min-[850px]:min-h-[420px] max-w-2xl flex-col">
       <div className="flex items-center gap-3 border-b border-white/10 pb-3">
         <Link to="/app" aria-label="Back to chats" className="hr-icon-button">
           <ArrowLeft size={18} />
         </Link>
-        <h1 className="prefFont text-lg font-extrabold">{title || '…'}</h1>
+        {title && title.startsWith('@') ? (
+          <Link to={`/app/u/${title.slice(1)}`} className="min-w-0 truncate prefFont text-lg font-extrabold hover:underline">{title}</Link>
+        ) : (
+          <h1 className="prefFont min-w-0 truncate text-lg font-extrabold">{title || '…'}</h1>
+        )}
       </div>
 
       <div ref={listRef} onScroll={onScroll} className="flex-1 space-y-2 overflow-y-auto py-4">

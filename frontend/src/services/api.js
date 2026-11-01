@@ -9,6 +9,16 @@ const API_BASE = (configuredApiBase || 'http://localhost:4000/api').replace(/\/+
 let csrfToken = null;
 
 /**
+ * The ticket cookie is httpOnly, so JS can't tell if a session exists. This flag
+ * (set on login/verify/recover, cleared on logout/401) lets logged-out visitors skip
+ * the /auth/me probe instead of logging a 401 in the console on every page load.
+ */
+const HINT_KEY = 'hr_session';
+const markSession = () => { try { localStorage.setItem(HINT_KEY, '1'); } catch { /* storage blocked */ } };
+const clearSessionHint = () => { try { localStorage.removeItem(HINT_KEY); } catch { /* storage blocked */ } };
+const hasSessionHint = () => { try { return localStorage.getItem(HINT_KEY) === '1'; } catch { return true; } };
+
+/**
  * Get CSRF token from cookies
  */
 const getCsrfToken = () => {
@@ -48,8 +58,10 @@ const apiCall = async (endpoint, options = {}) => {
     skipCsrf = false,
   } = options;
 
+  const isForm = typeof FormData !== 'undefined' && body instanceof FormData;
   const headers = {
-    'Content-Type': 'application/json',
+    // FormData: the browser sets multipart/form-data with the boundary itself.
+    ...(isForm ? {} : { 'Content-Type': 'application/json' }),
     ...options.headers,
   };
 
@@ -68,7 +80,7 @@ const apiCall = async (endpoint, options = {}) => {
   };
 
   if (body) {
-    config.body = JSON.stringify(body);
+    config.body = isForm ? body : JSON.stringify(body);
   }
 
   let response;
@@ -133,24 +145,46 @@ export const authService = {
    * POST /auth/verify-otp
    * Verify OTP sent to email
    */
-  verifyOtp: (payload) => {
-    return apiCall('/auth/verify-otp', {
+  verifyOtp: async (payload) => {
+    const res = await apiCall('/auth/verify-otp', {
       method: 'POST',
       body: payload,
       skipCsrf: true,
     });
+    markSession();
+    return res;
   },
+
+  /** POST /auth/resend-otp { email } */
+  resendOtp: (email) =>
+    apiCall('/auth/resend-otp', { method: 'POST', body: { email }, skipCsrf: true }),
+
+  /** POST /auth/ticket/request-reset { email } — public, emails a code */
+  requestReset: (email) =>
+    apiCall('/auth/ticket/request-reset', { method: 'POST', body: { email }, skipCsrf: true }),
+
+  /** POST /auth/ticket/confirm-reset { email, otp, password } — issues a ticket to this device */
+  confirmReset: async (payload) => {
+    const res = await apiCall('/auth/ticket/confirm-reset', { method: 'POST', body: payload, skipCsrf: true });
+    markSession();
+    return res;
+  },
+
+  /** POST /auth/ticket/change — rotate this device's ticket */
+  changeTicket: () => apiCall('/auth/ticket/change', { method: 'POST', body: {} }),
 
   /**
    * POST /auth/login
    * Login with email/username and password
    */
-  login: (payload) => {
-    return apiCall('/auth/login', {
+  login: async (payload) => {
+    const res = await apiCall('/auth/login', {
       method: 'POST',
       body: payload,
       skipCsrf: true,
     });
+    markSession();
+    return res;
   },
 
   /**
@@ -159,6 +193,7 @@ export const authService = {
    */
   logout: () => {
     clearCsrfCache();
+    clearSessionHint();
     return apiCall('/auth/logout', {
       method: 'POST',
     });
@@ -197,6 +232,12 @@ export const userService = {
       method: 'PATCH',
       body: payload,
     });
+  },
+
+  /** DELETE /users/me { password } — scrubs the account */
+  deleteAccount: (password) => {
+    clearCsrfCache();
+    return apiCall('/users/me', { method: 'DELETE', body: { password } });
   },
 };
 
@@ -264,6 +305,62 @@ export const chatService = {
     apiCall(`/chats/${encodeURIComponent(chatId)}/read`, { method: 'POST', body: {} }),
 };
 
+const qs = (params = {}) => {
+  const q = new URLSearchParams();
+  Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') q.set(k, String(v)); });
+  const s = q.toString();
+  return s ? `?${s}` : '';
+};
+
+/** GET/PATCH /settings */
+export const settingsService = {
+  get: () => apiCall('/settings'),
+  update: (payload) => apiCall('/settings', { method: 'PATCH', body: payload }),
+};
+
+/** /discovery */
+export const discoveryService = {
+  search: (q) => apiCall(`/discovery/search${qs({ q })}`),
+  nearby: ({ lat, lng, radiusKm }) => apiCall(`/discovery/nearby${qs({ lat, lng, radiusKm })}`),
+};
+
+/** POST /uploads — multipart. purpose: 'avatar' | undefined */
+export const uploadService = {
+  upload: (file, purpose) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    if (purpose) fd.append('purpose', purpose);
+    return apiCall('/uploads', { method: 'POST', body: fd });
+  },
+};
+
+/** /status — 24h posts */
+export const statusService = {
+  list: () => apiCall('/status'),
+  create: (payload) => apiCall('/status', { method: 'POST', body: payload }),
+  remove: (id) => apiCall(`/status/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+};
+
+/** /threads */
+export const threadService = {
+  list: (cursor) => apiCall(`/threads${qs({ cursor })}`),
+  get: (id) => apiCall(`/threads/${encodeURIComponent(id)}`),
+  create: (payload) => apiCall('/threads', { method: 'POST', body: payload }),
+  reply: (id, body) => apiCall(`/threads/${encodeURIComponent(id)}/replies`, { method: 'POST', body: { body } }),
+  remove: (id) => apiCall(`/threads/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+};
+
+/** /resources */
+export const resourceService = {
+  list: () => apiCall('/resources'),
+};
+
+/** /complaints */
+export const complaintService = {
+  list: () => apiCall('/complaints'),
+  create: (payload) => apiCall('/complaints', { method: 'POST', body: payload }),
+};
+
 /**
  * Utility to handle API errors
  */
@@ -277,4 +374,4 @@ export const getErrorMessage = (error) => {
   return 'An error occurred. Please try again.';
 };
 
-export { API_BASE, getCsrfToken, setCsrfToken, clearCsrfCache };
+export { API_BASE, getCsrfToken, setCsrfToken, clearCsrfCache, hasSessionHint, clearSessionHint };

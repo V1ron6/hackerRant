@@ -4,6 +4,7 @@ const http    = require('http');
 const app     = require('./app');
 const { init: initSockets } = require('./src/sockets');
 const { sequelize } = require('./src/models');
+const { seedIfEmpty } = require('./src/services/resource.service');
 
 const PORT = process.env.PORT || 4000;
 
@@ -18,6 +19,15 @@ initSockets(server);
 
     await sequelize.sync({ alter: false });
     console.log('Models synced');
+
+    await seedIfEmpty();
+
+    // Run the BullMQ email worker inside this process (one Render service
+    // instead of two). Leave unset and use `npm run worker` to run it separately.
+    if (process.env.RUN_EMAIL_WORKER === 'true') {
+      require('./src/jobs/email.worker');
+      console.log('Email worker started in-process');
+    }
 
     server.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);

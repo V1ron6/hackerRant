@@ -10,10 +10,12 @@ exports.generateToken = async (req, res, next) => {
 
     if (!sessionId) return next();
 
-    const token = crypto.randomBytes(32).toString('hex');
-
-    // Store in Redis keyed by user ID
-    await redis.set(`csrf:${sessionId}`, token, 'EX', TOKEN_TTL);
+    // Reuse a live token (and extend it) so several tabs/devices and concurrent
+    // /auth/me calls don't invalidate each other's token; mint one only when absent.
+    const key      = `csrf:${sessionId}`;
+    const existing = await redis.get(key);
+    const token    = existing || crypto.randomBytes(32).toString('hex');
+    await redis.set(key, token, 'EX', TOKEN_TTL);
 
     // The cookie is set by the API origin, so JS on a different frontend
     // origin (Vercel) cannot read it. Expose the token to the handler too.
@@ -52,10 +54,10 @@ exports.verifyToken = async (req, res, next) => {
       return res.status(403).json({ error: 'MERLIN: CSRF token expired' });
     }
 
-    const valid = crypto.timingSafeEqual(
-      Buffer.from(clientToken),
-      Buffer.from(storedToken)
-    );
+    // timingSafeEqual throws on unequal lengths — that would surface as a 500.
+    const a = Buffer.from(String(clientToken));
+    const b = Buffer.from(storedToken);
+    const valid = a.length === b.length && crypto.timingSafeEqual(a, b);
 
     if (!valid) {
       return res.status(403).json({ error: 'MERLIN: Invalid CSRF token' });

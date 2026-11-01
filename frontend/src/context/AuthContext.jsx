@@ -4,7 +4,7 @@
  */
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { authService } from '../services/api';
+import { authService, clearSessionHint, hasSessionHint } from '../services/api';
 import { closeSocket } from '../services/socket';
 
 const AuthContext = createContext(null);
@@ -14,6 +14,12 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
+    // Never signed in on this browser: nothing to restore, skip the probe.
+    if (!hasSessionHint()) {
+      setUser(null);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const res = await authService.getMe();
@@ -24,6 +30,7 @@ export const AuthProvider = ({ children }) => {
       }
     } catch (err) {
       // 401 = not authenticated
+      if (err?.status === 401) clearSessionHint();
       setUser(null);
     } finally {
       setLoading(false);
@@ -34,6 +41,7 @@ export const AuthProvider = ({ children }) => {
     try {
       await authService.logout();
     } finally {
+      clearSessionHint();
       closeSocket();
       setUser(null);
     }

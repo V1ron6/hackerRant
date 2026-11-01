@@ -1,4 +1,4 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import PublicHeader from '../../components/PublicHeader.jsx';
 import { authService, getErrorMessage } from '../../services/api.js';
@@ -12,10 +12,12 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [unverified, setUnverified] = useState(false);
 
   const onSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setUnverified(false);
 
     if (!identifier || !password) {
       setError('Enter your username/email and password.');
@@ -25,11 +27,12 @@ const Login = () => {
     setLoading(true);
     try {
       // API_DOCS.md: POST /auth/login
-      await authService.login({ identifier, password });
+      await authService.login({ identifier: identifier.trim().toLowerCase(), password });
       await refresh();
       navigate('/app', { replace: true });
     } catch (err) {
       setError(getErrorMessage(err));
+      setUnverified(err?.code === 'EMAIL_NOT_VERIFIED');
     } finally {
       setLoading(false);
     }
@@ -46,8 +49,9 @@ const Login = () => {
 
           <form className="mt-6 space-y-4" onSubmit={onSubmit}>
             <div>
-              <label className="text-sm font-semibold text-gray-700">Email or Username</label>
+              <label htmlFor="identifier" className="text-sm font-semibold text-gray-700">Email or Username</label>
               <input
+                id="identifier"
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
                 className="mt-2 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-red-200"
@@ -56,8 +60,9 @@ const Login = () => {
               />
             </div>
             <div>
-              <label className="text-sm font-semibold text-gray-700">Password</label>
+              <label htmlFor="password" className="text-sm font-semibold text-gray-700">Password</label>
               <input
+                id="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 type="password"
@@ -70,6 +75,9 @@ const Login = () => {
             {error ? (
               <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
                 {error}
+                {unverified ? (
+                  <>{' '}<Link className="font-semibold underline" to={`/signup?verify=${encodeURIComponent(identifier.includes('@') ? identifier.trim() : '')}`}>Verify your email</Link></>
+                ) : null}
               </div>
             ) : null}
 
@@ -89,8 +97,11 @@ const Login = () => {
             </Link>
           </p>
 
-          <p className="mt-3 text-xs text-gray-500">
-            API_DOCS.md notes: login attempts may rate-limit with `MELIODAS: Too many login attempts.`
+          <p className="mt-3 text-sm text-gray-700">
+            New device or lost your ticket?{' '}
+            <Link className="font-semibold text-red-600 hover:text-red-700" to="/recover">
+              Recover access
+            </Link>
           </p>
         </div>
       </main>

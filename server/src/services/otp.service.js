@@ -5,6 +5,7 @@ const { OtpStore }   = require('../models');
 const redis          = require('../config/redis');
 
 const OTP_TTL_MINUTES = 10;
+const MAX_ATTEMPTS    = 5;
 
 // Generate a 6-digit OTP, hash it, store in DB
 exports.createOtp = async (target, purpose) => {
@@ -26,10 +27,13 @@ exports.createOtp = async (target, purpose) => {
     expires_at: expires,
   });
 
+  await redis.del(`otp_attempts:${purpose}:${target}`);
+
   return otp; // raw OTP to send via email/SMS
 };
 
-// Verify OTP submitted by user
+// Verify OTP submitted by user. 5 wrong guesses burn the code: a 6-digit
+// code is only safe if guessing is capped.
 exports.verifyOtp = async (target, purpose, submittedOtp) => {
   const record = await OtpStore.findOne({
     where: { target, purpose, used: false },
@@ -40,11 +44,22 @@ exports.verifyOtp = async (target, purpose, submittedOtp) => {
     return false;
   }
 
-  const match = await bcrypt.compare(submittedOtp, record.otp_hash);
+  const key      = `otp_attempts:${purpose}:${target}`;
+  const attempts = await redis.incr(key);
+  if (attempts === 1) await redis.expire(key, OTP_TTL_MINUTES * 60);
+
+  if (attempts > MAX_ATTEMPTS) {
+    record.used = true;
+    await record.save();
+    return false;
+  }
+
+  const match = await bcrypt.compare(String(submittedOtp), record.otp_hash);
 
   if (match) {
     record.used = true;
     await record.save();
+    await redis.del(key);
   }
 
   return match;

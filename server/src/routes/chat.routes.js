@@ -13,7 +13,7 @@ router.get('/', chatCtrl.list);
 
 router.post('/',
   merlin.verifyToken,
-  body('username').trim().matches(/^[a-zA-Z0-9_]{3,30}$/).withMessage('Invalid username'),
+  body('username').trim().toLowerCase().matches(/^[a-z0-9_]{3,30}$/).withMessage('Invalid username'),
   ban, chatCtrl.create);
 
 router.get('/:chatId/messages', chatId, ban, chatCtrl.messages);

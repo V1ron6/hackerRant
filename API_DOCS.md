@@ -871,3 +871,52 @@ fetch('/api/sessions/sess-uuid-2', {
   },
 });
 ```
+
+---
+
+## Additional endpoints (implemented)
+
+All are under `/api`, authenticated with the `hr_ticket` cookie unless marked public. Mutations need the `x-csrf-token` header (token is returned in `GET /auth/me` → `data.csrfToken`). Success: `{ success, message, data }`. Errors: `{ error, code? }`.
+
+### Auth additions
+| Method | Path | Body | Notes |
+|---|---|---|---|
+| POST | `/auth/resend-otp` (public) | `{ email }` | Resends the 6-digit signup code. |
+| POST | `/auth/verify-otp` (public) | `{ email, otp }` | 5 wrong guesses burn the code. Logs the user in. |
+| POST | `/auth/login` (public) | `{ identifier, password }` | `403 code: EMAIL_NOT_VERIFIED` until the email is verified. |
+| POST | `/auth/ticket/change` | `{}` | Rotates this device's ticket. Counts toward the Escanor limit. |
+| POST | `/auth/ticket/request-reset` (public) | `{ email }` | Emails a code; same answer whether or not the account exists. |
+| POST | `/auth/ticket/confirm-reset` (public) | `{ email, otp, password }` | Needs the emailed code **and** the password. Revokes every old ticket/session and issues a ticket to the new device. |
+
+### Users
+- `PATCH /users/me` — `first_name, last_name, bio (≤500), dob, avatar_url, latitude, longitude`. `avatar_url` must be an uploaded file URL. Coordinates need location sharing on; they are rounded to 2 decimals.
+- `DELETE /users/me` — `{ password }`. Scrubs personal data, revokes sessions, disconnects sockets.
+- `GET /users/:username` — public fields only (username, name, bio, avatar, joined).
+
+### Settings
+- `GET /settings`, `PATCH /settings` — `{ notifications: bool, chat_theme: "default"|"ocean"|"forest"|"violet", share_location: bool }`. Turning `share_location` off erases stored coordinates.
+
+### Discovery (RantFinder)
+- `GET /discovery/search?q=` — username prefix search (≥2 chars, max 20).
+- `GET /discovery/nearby?lat&lng&radiusKm` — only works if you AND the other person opted in. Returns a coarse `distanceKm`, never coordinates.
+
+### Uploads
+- `POST /uploads` — multipart `file` (+ optional `purpose=avatar`). Type is sniffed from the bytes; images are re-encoded to WebP with metadata stripped. Limits: image 5 MB, audio 15 MB, video 25 MB. Returns `{ url, kind }`.
+
+### Status (24 h posts)
+- `GET /status`, `POST /status { kind: text|image|video|audio, text?, media_url? }`, `DELETE /status/:id` (own posts).
+
+### Threads
+- `GET /threads?cursor` → `{ threads, nextCursor }`, `GET /threads/:id` (includes `replies`), `POST /threads { title 3–150, body 3–3000 }`, `POST /threads/:id/replies { body 1–2000 }`, `DELETE /threads/:id` (author only).
+
+### Resources (Ranres)
+- `GET /resources`. `POST /resources` is admin-only (usernames in `ADMIN_USERNAMES`), https URLs only.
+
+### Complaints
+- `GET /complaints` (mine), `POST /complaints { subject 3–120, message 10–3000 }`.
+
+### Chats
+- `GET /chats`, `POST /chats { username }`, `GET /chats/:chatId/messages?cursor&limit`, `POST /chats/:chatId/messages { text }`, `POST /chats/:chatId/read`.
+- Socket events: `message:send` (with ack), `message:receive`, `typing:start`, `typing:stop`, `message:read`.
+
+> The "Notifications" and "chat:message:new / presence:update" items in older planning notes are **not** implemented; notifications are browser notifications driven by `message:receive`.

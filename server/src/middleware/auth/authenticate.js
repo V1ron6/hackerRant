@@ -1,7 +1,10 @@
-const { Ticket, User, Session } = require('../../models');
-const { verifyTicket }          = require('../../utils/ticket');
-const fingerprint               = require('../../utils/fingerprint');
-const { unauthorized }          = require('../../utils/response');
+const { Session }         = require('../../models');
+const fingerprint         = require('../../utils/fingerprint');
+const { unauthorized }    = require('../../utils/response');
+const ticketService       = require('../../services/ticket.service');
+const authService         = require('../../services/auth.service');
+
+const RENEW_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 module.exports = async (req, res, next) => {
   try {
@@ -11,26 +14,8 @@ module.exports = async (req, res, next) => {
       return unauthorized(res, 'No ticket provided');
     }
 
-    // Find a valid, non-blacklisted ticket by fingerprint
-    const fp = fingerprint(req);
-
-    const tickets = await Ticket.findAll({
-      where: {
-        fingerprint:    fp,
-        is_blacklisted: false,
-      },
-      include: [{ model: User, attributes: { exclude: ['password_hash'] } }],
-    });
-
-    let matched = null;
-
-    for (const ticket of tickets) {
-      const valid = await verifyTicket(rawTicket, ticket.token_hash);
-      if (valid && new Date(ticket.expires_at) > new Date()) {
-        matched = ticket;
-        break;
-      }
-    }
+    const fp      = fingerprint(req);
+    const matched = await ticketService.findValidTicket(rawTicket, fp);
 
     if (!matched) {
       return unauthorized(res, 'Invalid or expired ticket');
@@ -46,9 +31,15 @@ module.exports = async (req, res, next) => {
       { where: { user_id: matched.user_id, fingerprint: fp, is_revoked: false } }
     );
 
-    req.user      = matched.User;
-    req.ticketId  = matched.id;
+    req.user        = matched.User;
+    req.ticketId    = matched.id;
     req.fingerprint = fp;
+
+    // Tickets last 90 days: inside the final week, swap in a fresh one and
+    // blacklist the old (buildi.txt). Same device, so the binding is unchanged.
+    if (new Date(matched.expires_at) - Date.now() < RENEW_WINDOW_MS) {
+      await authService.issueTicket(req, res, matched.User, 'TICKET_RENEW');
+    }
 
     next();
   } catch (err) {

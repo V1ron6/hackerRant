@@ -5,10 +5,12 @@ import RootLayout from './components/RootLayout';
 import LoadingScreen from './components/LoadingScreen';
 import RequireAuth from './components/RequireAuth.jsx';
 import ClientLayout from './components/ClientLayout.jsx';
+import { SettingsProvider } from './context/SettingsContext.jsx';
 
 // ── Auth ──────────────────────────────────────────────
 const Login = lazy(() => import('./pages/auth/login'));
 const Signup = lazy(() => import('./pages/auth/signup'));
+const Recover = lazy(() => import('./pages/auth/Recover'));
 const Home =lazy(()=>import('./pages/Home'))
 
 // ── Client ───────────────────────────────────────────
@@ -21,6 +23,8 @@ const Ranres = lazy(() => import('./pages/client/Ranres.jsx'));
 const Profile = lazy(() => import('./pages/client/profile.jsx'));
 const Settings = lazy(() => import('./pages/client/settings.jsx'));
 const Complains = lazy(() => import('./pages/client/Complains.jsx'));
+const ThreadDetail = lazy(() => import('./pages/client/ThreadDetail.jsx'));
+const PublicProfile = lazy(() => import('./pages/client/PublicProfile.jsx'));
 
 
 // ── Suspense wrapper ──────────────────────────────────
@@ -38,6 +42,7 @@ const router = createBrowserRouter([
       // Public / Auth
       { path: '/' , element: <Suspended><Home /></Suspended> },
       { path: '/login' , element: <Suspended><Login /></Suspended> },
+      { path: '/recover', element: <Suspended><Recover /></Suspended> },
       { path: '/signup' , element: <Suspended><Signup /></Suspended> },
 
       // App (authenticated)
@@ -45,7 +50,9 @@ const router = createBrowserRouter([
         path: '/app',
         element: (
           <RequireAuth>
-            <ClientLayout />
+            <SettingsProvider>
+              <ClientLayout />
+            </SettingsProvider>
           </RequireAuth>
         ),
         children: [
@@ -53,6 +60,8 @@ const router = createBrowserRouter([
           { path: 'chat/:chatId', element: <Suspended><ChatDetail /></Suspended> },
           { path: 'status', element: <Suspended><Status /></Suspended> },
           { path: 'threads', element: <Suspended><Threads /></Suspended> },
+          { path: 'threads/:id', element: <Suspended><ThreadDetail /></Suspended> },
+          { path: 'u/:username', element: <Suspended><PublicProfile /></Suspended> },
           { path: 'rantfinder', element: <Suspended><RantFinder /></Suspended> },
           { path: 'ranres', element: <Suspended><Ranres /></Suspended> },
           { path: 'profile', element: <Suspended><Profile /></Suspended> },

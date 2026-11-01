@@ -14,6 +14,7 @@ const Ticket = sequelize.define('Ticket', {
   token_hash: {
     type:      DataTypes.STRING(255),
     allowNull: false,
+    unique:    true,
   },
   fingerprint: {
     type:      DataTypes.STRING(255),

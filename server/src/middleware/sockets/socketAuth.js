@@ -1,7 +1,6 @@
 const cookie          = require('cookie');
-const { Ticket, User } = require('../../models');
-const { verifyTicket } = require('../../utils/ticket');
-const fingerprint      = require('../../utils/fingerprint');
+const fingerprint     = require('../../utils/fingerprint');
+const ticketService   = require('../../services/ticket.service');
 
 module.exports = async (socket, next) => {
   try {
@@ -13,25 +12,14 @@ module.exports = async (socket, next) => {
       return next(new Error('SOCKET_AUTH: No ticket'));
     }
 
-    const fp = fingerprint(socket.request);
-
-    const tickets = await Ticket.findAll({
-      where: { fingerprint: fp, is_blacklisted: false },
-      include: [{ model: User, attributes: { exclude: ['password_hash'] } }],
-    });
-
-    let matched = null;
-
-    for (const ticket of tickets) {
-      const valid = await verifyTicket(rawTicket, ticket.token_hash);
-      if (valid && new Date(ticket.expires_at) > new Date()) {
-        matched = ticket;
-        break;
-      }
-    }
+    const matched = await ticketService.findValidTicket(rawTicket, fingerprint(socket.request));
 
     if (!matched) {
       return next(new Error('SOCKET_AUTH: Invalid ticket'));
+    }
+
+    if (matched.User.status !== 'active') {
+      return next(new Error('SOCKET_AUTH: Account suspended or deleted'));
     }
 
     socket.user = matched.User;

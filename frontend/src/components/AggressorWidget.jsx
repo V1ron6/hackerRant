@@ -77,10 +77,10 @@ const AggressorWidget = () => {
   if (!isAuthenticated) return null;
 
   return (
-    <div className="fixed bottom-5 left-5 z-50">
-      <div className="flex items-center gap-3 rounded-full border border-black/10 bg-white/90 px-4 py-2 shadow-sm backdrop-blur">
+    <div className="pointer-events-none fixed bottom-3 left-3 z-50 sm:bottom-5 sm:left-5" aria-live="polite">
+      <div className="flex items-center gap-3 rounded-full border border-black/10 bg-white/90 px-2.5 py-2 shadow-sm backdrop-blur sm:px-4" title="Ticket verifier">
         <span className={`h-3.5 w-3.5 rounded-full ${color}`} />
-        <div className="text-xs">
+        <div className="hidden text-xs sm:block">
           <div className="font-semibold text-gray-900">Aggressor</div>
           <div className="text-gray-500">
             {status === 'verifying' ? 'verifying ticket…' : status === 'verified' ? 'ticket verified' : status === 'idle' ? 'standing by' : 'ticket invalid'}

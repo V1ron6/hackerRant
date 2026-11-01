@@ -1,5 +1,5 @@
-﻿import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import PublicHeader from '../../components/PublicHeader.jsx';
 import { authService, getErrorMessage } from '../../services/api.js';
 import { useAuth } from '../../context/AuthContext.jsx';
@@ -12,12 +12,23 @@ const labelClass = 'text-sm font-semibold text-gray-700';
 const Signup = () => {
   const navigate = useNavigate();
   const { refresh } = useAuth();
+  const [params] = useSearchParams();
+  const verifyEmail = (params.get('verify') || '').trim().toLowerCase();
 
-  const [step, setStep] = useState('form'); // 'form' -> 'otp'
-  const [form, setForm] = useState({ username: '', email: '', phone: '', password: '' });
+  // ?verify=<email> comes from the login page when the account isn't verified yet.
+  const [step, setStep] = useState(verifyEmail ? 'otp' : 'form'); // 'form' -> 'otp'
+  const [form, setForm] = useState({ username: '', email: verifyEmail, phone: '', password: '' });
+  const [info, setInfo] = useState('');
+  const [cooldown, setCooldown] = useState(0);
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (cooldown <= 0) return undefined;
+    const id = window.setTimeout(() => setCooldown((c) => c - 1), 1000);
+    return () => window.clearTimeout(id);
+  }, [cooldown]);
 
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
@@ -35,16 +46,29 @@ const Signup = () => {
     setLoading(true);
     try {
       await authService.register({
-        username: form.username.trim(),
-        email: form.email.trim(),
+        username: form.username.trim().toLowerCase(),
+        email: form.email.trim().toLowerCase(),
         phone: form.phone.trim(),
         password: form.password,
       });
       setStep('otp');
+      setCooldown(30);
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const onResend = async () => {
+    setError('');
+    setInfo('');
+    try {
+      await authService.resendOtp(form.email.trim().toLowerCase());
+      setInfo('A new code is on its way.');
+      setCooldown(30);
+    } catch (err) {
+      setError(getErrorMessage(err));
     }
   };
 
@@ -56,7 +80,7 @@ const Signup = () => {
 
     setLoading(true);
     try {
-      await authService.verifyOtp({ email: form.email.trim(), otp });
+      await authService.verifyOtp({ email: form.email.trim().toLowerCase(), otp });
       await refresh();
       navigate('/app', { replace: true });
     } catch (err) {
@@ -84,20 +108,20 @@ const Signup = () => {
           {step === 'form' ? (
             <form className="mt-6 space-y-4" onSubmit={onRegister}>
               <div>
-                <label className={labelClass}>Username</label>
-                <input value={form.username} onChange={set('username')} className={fieldClass} placeholder="v1ron" autoComplete="username" maxLength={30} />
+                <label htmlFor="username" className={labelClass}>Username</label>
+                <input id="username" value={form.username} onChange={set('username')} className={fieldClass} placeholder="v1ron" autoComplete="username" maxLength={30} />
               </div>
               <div>
-                <label className={labelClass}>Email</label>
-                <input value={form.email} onChange={set('email')} type="email" className={fieldClass} placeholder="v1ron@example.com" autoComplete="email" />
+                <label htmlFor="email" className={labelClass}>Email</label>
+                <input id="email" value={form.email} onChange={set('email')} type="email" className={fieldClass} placeholder="v1ron@example.com" autoComplete="email" />
               </div>
               <div>
-                <label className={labelClass}>Phone</label>
-                <input value={form.phone} onChange={set('phone')} type="tel" className={fieldClass} placeholder="+233201234567" autoComplete="tel" />
+                <label htmlFor="phone" className={labelClass}>Phone</label>
+                <input id="phone" value={form.phone} onChange={set('phone')} type="tel" className={fieldClass} placeholder="+233201234567" autoComplete="tel" />
               </div>
               <div>
-                <label className={labelClass}>Password</label>
-                <input value={form.password} onChange={set('password')} type="password" className={fieldClass} placeholder="At least 8 characters" autoComplete="new-password" />
+                <label htmlFor="password" className={labelClass}>Password</label>
+                <input id="password" value={form.password} onChange={set('password')} type="password" className={fieldClass} placeholder="At least 8 characters" autoComplete="new-password" />
               </div>
 
               {error ? <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div> : null}
@@ -109,8 +133,9 @@ const Signup = () => {
           ) : (
             <form className="mt-6 space-y-4" onSubmit={onVerify}>
               <div>
-                <label className={labelClass}>6-digit code</label>
+                <label htmlFor="otp" className={labelClass}>6-digit code</label>
                 <input
+                  id="otp"
                   value={otp}
                   onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
                   className={`${fieldClass} tracking-[0.4em]`}
@@ -125,6 +150,14 @@ const Signup = () => {
               <button disabled={loading} className="w-full rounded-lg bg-red-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-600 disabled:opacity-60" type="submit">
                 {loading ? 'Verifying…' : 'Verify and continue'}
               </button>
+
+              {info ? <p className="text-sm text-emerald-700" role="status">{info}</p> : null}
+              <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                <button type="button" onClick={onResend} disabled={cooldown > 0} className="font-semibold text-red-600 hover:text-red-700 disabled:text-gray-400">
+                  {cooldown > 0 ? `Resend code in ${cooldown}s` : 'Resend code'}
+                </button>
+                {!verifyEmail ? <button type="button" onClick={() => { setStep('form'); setError(''); setInfo(''); }} className="text-gray-600 underline">Change email</button> : null}
+              </div>
             </form>
           )}
 

@@ -38,6 +38,19 @@ app.use(
   })
 );
 
+// ─── Locally stored uploads (STORAGE_DRIVER=local) ───────────────────────────
+// Served cross-origin to the frontend, never sniffed or executed, immutable (random names).
+if ((process.env.STORAGE_DRIVER || 'local').toLowerCase() === 'local') {
+  app.use('/uploads', express.static(require('./src/services/storage.service').UPLOAD_DIR, {
+    index: false, dotfiles: 'deny', maxAge: '30d', immutable: true,
+    setHeaders: (res) => {
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox");
+    },
+  }));
+}
+
 // ─── Body / cookies ───────────────────────────────────────────────────────────
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb', parameterLimit: 100 }));
@@ -79,7 +92,7 @@ app.use((err, req, res, next) => {
     ? 'Internal server error'
     : (err.publicMessage || err.message || 'Request failed');
 
-  res.status(status).json({ error: message });
+  res.status(status).json({ error: message, ...(err.code && status < 500 ? { code: err.code } : {}) });
 });
 
 module.exports = app;

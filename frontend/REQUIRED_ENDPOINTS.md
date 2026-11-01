@@ -162,3 +162,7 @@ Maintain README.md naming, plus:
 - `aggressor:invalid` (server -> client)
 
 Client should authenticate sockets using cookies (README Phase 6).
+
+## Status of this list
+Everything the frontend pages call is implemented in the backend — see "Additional endpoints (implemented)" in `API_DOCS.md`.
+Not built: `/threads/generate` (AI question generation, needs an LLM key) and `/notifications` (replaced by browser notifications).

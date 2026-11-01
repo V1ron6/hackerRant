@@ -1,6 +1,7 @@
 /** Authenticated app shell: glassy, Discord-inspired navigation with a WhatsApp-like chat feel. */
 import { Link, NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import Avatar from './Avatar.jsx';
 import AggressorWidget from './AggressorWidget.jsx';
 import { MessageCircle, CircleDot, MessagesSquare, Search, Library, UserRound, Settings, ShieldAlert, LogOut, Radio } from 'lucide-react';
 
@@ -39,7 +40,7 @@ export default function ClientLayout() {
             {accountItems.map(({ to, label, icon: Icon }) => <NavLink key={to} to={to} className={navItem}><Icon size={18} strokeWidth={1.9} /><span>{label}</span></NavLink>)}
           </nav>
           <div className="hr-sidebar-bottom">
-            <div className="hr-user-card"><div className="hr-avatar">{username.slice(0, 1).toUpperCase()}</div><div className="hr-user-meta"><strong>{username}</strong><small><span className="hr-online-dot" /> Connected</small></div><button type="button" className="hr-icon-button" onClick={logout} aria-label="Log out" title="Log out"><LogOut size={17} /></button></div>
+            <div className="hr-user-card"><Avatar src={user?.avatar_url} name={username} size={35} /><div className="hr-user-meta"><strong>{username}</strong><small><span className="hr-online-dot" /> Connected</small></div><button type="button" className="hr-icon-button" onClick={logout} aria-label="Log out" title="Log out"><LogOut size={17} /></button></div>
             <div className="hr-security-note"><Radio size={15} /><span>Privacy-minded by design</span></div>
           </div>
         </aside>
