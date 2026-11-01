@@ -1,0 +1,62 @@
+# Render Blueprint: API + Key Value (Redis). Database is Neon (set DATABASE_URL by hand).
+services:
+  - type: web
+    name: hackerrant-api
+    runtime: node
+    region: frankfurt
+    plan: free
+    rootDir: server
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL        # Neon pooled string for neondb_owner (...-pooler..., sslmode=require)
+        sync: false
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: hackerrant-redis
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: COOKIE_SECRET
+        generateValue: true
+      - key: CLIENT_URL          # exact Vercel origin, no trailing slash
+        sync: false
+      - key: PUBLIC_URL          # this API's public URL, e.g. https://hackerrant-api.onrender.com
+        sync: false
+      - key: RUN_EMAIL_WORKER
+        value: "true"
+      - key: MAILJET_API_KEY
+        sync: false
+      - key: MAILJET_API_SECRET
+        sync: false
+      - key: MAIL_FROM           # must be a sender verified in Mailjet
+        sync: false
+      - key: MAIL_FROM_NAME
+        value: hackerRant
+      - key: STORAGE_DRIVER      # r2 in production: Render's disk is wiped on every deploy
+        value: r2
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET
+        sync: false
+      - key: R2_PUBLIC_URL
+        sync: false
+      - key: ADMIN_USERNAMES
+        sync: false
+
+  - type: keyvalue
+    name: hackerrant-redis
+    region: frankfurt
+    plan: free
+    ipAllowList: []   # internal connections only
+    maxmemoryPolicy: noeviction

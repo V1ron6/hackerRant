@@ -1,5 +1,7 @@
-frontend.bak
-hgbmiMon
-yettbi.txt
-hackerrant-server.zip
-hackerrant-server
+node_modules
+dist
+.env
+.env.*
+!.env.example
+server/uploads
+*.log
