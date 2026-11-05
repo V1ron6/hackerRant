@@ -12,7 +12,7 @@ module.exports = async (socket, next) => {
       return next(new Error('SOCKET_AUTH: No ticket'));
     }
 
-    const matched = await ticketService.findValidTicket(rawTicket, fingerprint(socket.request));
+    const matched = await ticketService.findValidTicket(rawTicket, fingerprint(socket.request), fingerprint.partialIp(socket.request));
 
     if (!matched) {
       return next(new Error('SOCKET_AUTH: Invalid ticket'));

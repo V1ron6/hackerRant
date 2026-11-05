@@ -15,7 +15,7 @@ module.exports = async (req, res, next) => {
     }
 
     const fp      = fingerprint(req);
-    const matched = await ticketService.findValidTicket(rawTicket, fp);
+    const matched = await ticketService.findValidTicket(rawTicket, fp, fingerprint.partialIp(req));
 
     if (!matched) {
       return unauthorized(res, 'Invalid or expired ticket');

@@ -61,15 +61,11 @@ const deviceClass = (ua = '') => {
   return `${browser}|${os}`;
 };
 
-const fingerprint = (req) => {
-  const ua = req.headers?.['user-agent'] || '';
-  // Accept-Language is intentionally excluded: users change it, and it can
-  // differ between fetch() and the Socket.io handshake.
-  return crypto
-    .createHash('sha256')
-    .update(`${deviceClass(ua)}|${partialIp(req)}`)
-    .digest('hex');
-};
+// Device fingerprint = browser/OS family only. The network prefix is NOT part of
+// it: it's tracked per ticket (see ticket.service) and may drift without
+// invalidating the ticket.
+const fingerprint = (req) =>
+  crypto.createHash('sha256').update(deviceClass(req.headers?.['user-agent'] || '')).digest('hex');
 
 module.exports = fingerprint;
 module.exports.partialIp = partialIp;
