@@ -2,7 +2,7 @@ const bcrypt         = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
 const { Op }         = require('sequelize');
 const { User, Ticket, Session } = require('../models');
-const { generateTicket }        = require('../utils/ticket');
+const { generateTicket, hashTicket } = require('../utils/ticket');
 const fingerprint               = require('../utils/fingerprint');
 const auditService              = require('./audit.service');
 
@@ -66,32 +66,42 @@ exports.loginUser = async (identifier, password) => {
 };
 
 // ─── Issue ticket + cookie ─────────────────────────────────────────────────
-// One live ticket per device: a new login/change blacklists the device's earlier
-// tickets. (Otherwise they pile up and every lookup has more to check.)
-// action 'TICKET_RENEW' is the 90-day auto-renewal: old tickets get a short grace
-// period instead, so parallel in-flight requests don't strand the browser on a
-// dead cookie, and no new session row is created.
+// A new login/change blacklists only the ticket THIS browser presented (not every
+// ticket sharing the fingerprint, which would sign out other devices that look
+// alike, e.g. two phones on one carrier), and live tickets per device are capped
+// so they can't pile up.
+// action 'TICKET_RENEW' is the 90-day auto-renewal: the old ticket gets a short
+// grace period instead, so parallel in-flight requests don't strand the browser
+// on a dead cookie, and no new session row is created.
+const MAX_LIVE_TICKETS_PER_DEVICE = 5;
+
 exports.issueTicket = async (req, res, user, action = 'LOGIN') => {
   const fp        = fingerprint(req);
-  const partialIP = (req.ip || '').split('.').slice(0, 2).join('.');
+  const partialIP = fingerprint.partialIp(req);
   const renewing  = action === 'TICKET_RENEW';
-  const { raw, hash, expiresAt } = await generateTicket();
+  const presented = typeof req.cookies?.hr_ticket === 'string' && req.cookies.hr_ticket
+    ? hashTicket(req.cookies.hr_ticket)
+    : null;
 
   if (renewing) {
-    await Ticket.update(
-      { expires_at: new Date(Date.now() + RENEW_GRACE_MS) },
-      { where: { user_id: user.id, fingerprint: fp, is_blacklisted: false, expires_at: { [Op.gt]: new Date(Date.now() + RENEW_GRACE_MS) } } }
+    // Atomic claim: only the first of several parallel requests renews. The old
+    // code shrank EVERY live ticket of the device to the 5-minute grace window,
+    // including the fresh one a sibling request had just issued, so whichever
+    // cookie won the race died five minutes later.
+    const graceEnd = new Date(Date.now() + RENEW_GRACE_MS);
+    const [claimed] = await Ticket.update(
+      { expires_at: graceEnd },
+      { where: { id: req.ticketId, is_blacklisted: false, expires_at: { [Op.gt]: graceEnd } } }
     );
-  } else {
+    if (!claimed) return; // already renewed by a concurrent request
+  } else if (presented) {
     await Ticket.update(
       { is_blacklisted: true },
-      { where: { user_id: user.id, fingerprint: fp, is_blacklisted: false } }
-    );
-    await Session.update(
-      { is_revoked: true },
-      { where: { user_id: user.id, fingerprint: fp, is_revoked: false } }
+      { where: { token_hash: presented, is_blacklisted: false } }
     );
   }
+
+  const { raw, hash, expiresAt } = await generateTicket();
 
   await Ticket.create({
     id:          uuidv4(),
@@ -103,13 +113,35 @@ exports.issueTicket = async (req, res, user, action = 'LOGIN') => {
   });
 
   if (!renewing) {
-    await Session.create({
-      id:          uuidv4(),
-      user_id:     user.id,
-      fingerprint: fp,
-      user_agent:  req.headers['user-agent'] || '',
-      ip_address:  req.ip,
+    // Cap live tickets for this user+device; blacklist the oldest extras.
+    const live = await Ticket.findAll({
+      where: { user_id: user.id, fingerprint: fp, is_blacklisted: false },
+      order: [['created_at', 'DESC']],
+      attributes: ['id'],
     });
+    const extra = live.slice(MAX_LIVE_TICKETS_PER_DEVICE).map((t) => t.id);
+    if (extra.length) {
+      await Ticket.update({ is_blacklisted: true }, { where: { id: { [Op.in]: extra } } });
+    }
+
+    const existing = await Session.findOne({
+      where: { user_id: user.id, fingerprint: fp, is_revoked: false },
+    });
+    if (existing) {
+      await existing.update({
+        last_active_at: new Date(),
+        user_agent:     req.headers['user-agent'] || '',
+        ip_address:     req.ip,
+      });
+    } else {
+      await Session.create({
+        id:          uuidv4(),
+        user_id:     user.id,
+        fingerprint: fp,
+        user_agent:  req.headers['user-agent'] || '',
+        ip_address:  req.ip,
+      });
+    }
   }
 
   // NOTE: sameSite must be 'none' for cross-origin (Vercel ↔ Render)
@@ -124,20 +156,33 @@ exports.issueTicket = async (req, res, user, action = 'LOGIN') => {
 };
 
 // ─── Logout ───────────────────────────────────────────────────────────────────
+// Ends this browser's ticket only; the device session is revoked once no live
+// ticket remains for the fingerprint.
 exports.revokeTicket = async (req, res, userId) => {
-  const fp = fingerprint(req);
+  const fp        = fingerprint(req);
+  const presented = typeof req.cookies?.hr_ticket === 'string' && req.cookies.hr_ticket
+    ? hashTicket(req.cookies.hr_ticket)
+    : null;
 
-  await Ticket.update(
-    { is_blacklisted: true },
-    { where: { user_id: userId, fingerprint: fp } }
-  );
+  if (presented) {
+    await Ticket.update(
+      { is_blacklisted: true },
+      { where: { user_id: userId, token_hash: presented } }
+    );
+  }
 
-  await Session.update(
-    { is_revoked: true },
-    { where: { user_id: userId, fingerprint: fp } }
-  );
+  const remaining = await Ticket.count({
+    where: { user_id: userId, fingerprint: fp, is_blacklisted: false, expires_at: { [Op.gt]: new Date() } },
+  });
 
-  res.clearCookie('hr_ticket', { sameSite: 'none', secure: true });
+  if (remaining === 0) {
+    await Session.update(
+      { is_revoked: true },
+      { where: { user_id: userId, fingerprint: fp } }
+    );
+  }
+
+  res.clearCookie('hr_ticket', { sameSite: 'none', secure: true, httpOnly: true });
 
   await auditService.log(userId, 'LOGOUT', { ip: req.ip });
 };

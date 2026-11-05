@@ -14,14 +14,63 @@ const clientIp = (req) => {
   return req.socket?.remoteAddress || '';
 };
 
-module.exports = (req) => {
-  const userAgent = req.headers['user-agent']       || '';
-  const language  = req.headers['accept-language']  || '';
-  // partial IP — first two octets only, avoids dynamic IP mismatches
-  const partialIP = clientIp(req).split('.').slice(0, 2).join('.');
+// Coarse network prefix, stable across normal IP churn (buildi.txt: bound to IP,
+// but a strict match locks people out on mobile/dynamic networks).
+//   IPv4 (incl. ::ffff:a.b.c.d) -> first two octets   "41.202"
+//   IPv6                        -> first two hextets  "2001:db8"
+// The old code split on '.', so any native IPv6 address was used in full and
+// changed on practically every reconnect.
+const partialIp = (req) => {
+  let ip = String(clientIp(req) || '').trim().toLowerCase();
+  if (ip.startsWith('::ffff:')) ip = ip.slice(7);
 
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(ip)) {
+    return ip.split('.').slice(0, 2).join('.');
+  }
+
+  if (ip.includes(':')) {
+    const [head] = ip.split('::');               // hextets before any '::'
+    const groups = head.split(':').filter(Boolean);
+    while (groups.length < 2) groups.push('0');
+    return groups.slice(0, 2).map((g) => g.replace(/^0+(?=.)/, '')).join(':');
+  }
+
+  return ip;
+};
+
+// Browser/OS family only. The raw User-Agent changes with every browser update
+// (Chrome ships roughly monthly) and OS upgrade, which silently invalidated
+// 90-day tickets. Versions are deliberately ignored.
+const deviceClass = (ua = '') => {
+  const browser =
+    /edg(e|a|ios)?\//i.test(ua)   ? 'edge'    :
+    /opr\/|opera/i.test(ua)       ? 'opera'   :
+    /firefox|fxios/i.test(ua)     ? 'firefox' :
+    /samsungbrowser/i.test(ua)    ? 'samsung' :
+    /chrome|crios|chromium/i.test(ua) ? 'chrome' :
+    /safari/i.test(ua)            ? 'safari'  : 'other';
+
+  const os =
+    /android/i.test(ua)                 ? 'android' :
+    /iphone|ipad|ipod/i.test(ua)        ? 'ios'     :
+    /windows/i.test(ua)                 ? 'windows' :
+    /cros/i.test(ua)                    ? 'chromeos':
+    /mac os x|macintosh/i.test(ua)      ? 'macos'   :
+    /linux|x11/i.test(ua)               ? 'linux'   : 'other';
+
+  return `${browser}|${os}`;
+};
+
+const fingerprint = (req) => {
+  const ua = req.headers?.['user-agent'] || '';
+  // Accept-Language is intentionally excluded: users change it, and it can
+  // differ between fetch() and the Socket.io handshake.
   return crypto
     .createHash('sha256')
-    .update(userAgent + language + partialIP)
+    .update(`${deviceClass(ua)}|${partialIp(req)}`)
     .digest('hex');
 };
+
+module.exports = fingerprint;
+module.exports.partialIp = partialIp;
+module.exports.deviceClass = deviceClass;
