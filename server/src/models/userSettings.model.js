@@ -22,6 +22,10 @@ const UserSettings = sequelize.define('UserSettings', {
     allowNull:    false,
     defaultValue: false,
   },
+  // When off, others are not told when you read their messages.
+  read_receipts: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true },
+  // 'everyone' or 'following' (only people you follow can message you).
+  who_can_message: { type: DataTypes.STRING(10), allowNull: false, defaultValue: 'everyone' },
 }, {
   tableName:  'user_settings',
   timestamps: false,

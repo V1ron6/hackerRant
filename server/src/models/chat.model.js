@@ -18,6 +18,8 @@ const Chat = sequelize.define('Chat', {
     allowNull: false,
     unique:    true,
   },
+  // Seconds until new messages vanish; null = off.
+  disappear_after: DataTypes.INTEGER,
 }, {
   tableName:  'chats',
   timestamps: true,

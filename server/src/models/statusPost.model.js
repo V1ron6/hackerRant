@@ -17,6 +17,8 @@ const StatusPost = sequelize.define('StatusPost', {
   },
   text:      DataTypes.TEXT,
   media_url: DataTypes.STRING(500),
+  // 'public' = everyone, 'followers' = only people who follow the author.
+  visibility: { type: DataTypes.STRING(10), allowNull: false, defaultValue: 'public' },
 }, {
   tableName:  'status_posts',
   timestamps: true,

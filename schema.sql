@@ -206,3 +206,54 @@ ALTER TABLE ONLY tickets
     ADD CONSTRAINT tickets_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE;
 ALTER TABLE ONLY user_settings
     ADD CONSTRAINT user_settings_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+-- ─── 2026-11-06: follows, blocks, story views, reels, disappearing messages, privacy ───
+-- (Existing databases: run server/migrations/2026-11-06-social-privacy.sql for the column changes;
+--  the new tables below are also created automatically by sequelize.sync on boot.)
+ALTER TABLE status_posts  ADD COLUMN visibility      character varying(10) DEFAULT 'public' NOT NULL;
+ALTER TABLE messages      ADD COLUMN expires_at      timestamp with time zone;
+ALTER TABLE chats         ADD COLUMN disappear_after integer;
+ALTER TABLE user_settings ADD COLUMN read_receipts   boolean DEFAULT true NOT NULL;
+ALTER TABLE user_settings ADD COLUMN who_can_message character varying(10) DEFAULT 'everyone' NOT NULL;
+
+CREATE TABLE follows (
+    follower_id character(36) NOT NULL,
+    followee_id character(36) NOT NULL,
+    created_at timestamp with time zone NOT NULL,
+    PRIMARY KEY (follower_id, followee_id)
+);
+CREATE INDEX follows_followee_id ON follows (followee_id);
+
+CREATE TABLE blocks (
+    blocker_id character(36) NOT NULL,
+    blocked_id character(36) NOT NULL,
+    created_at timestamp with time zone NOT NULL,
+    PRIMARY KEY (blocker_id, blocked_id)
+);
+CREATE INDEX blocks_blocked_id ON blocks (blocked_id);
+
+CREATE TABLE status_views (
+    status_id character(36) NOT NULL,
+    viewer_id character(36) NOT NULL,
+    viewed_at timestamp with time zone NOT NULL,
+    PRIMARY KEY (status_id, viewer_id)
+);
+CREATE INDEX status_views_viewer_id ON status_views (viewer_id);
+
+CREATE TABLE reels (
+    id character(36) PRIMARY KEY,
+    user_id character(36) NOT NULL,
+    video_url character varying(500) NOT NULL,
+    caption character varying(150),
+    visibility character varying(10) DEFAULT 'public' NOT NULL,
+    created_at timestamp with time zone NOT NULL
+);
+CREATE INDEX reels_created_at ON reels (created_at);
+CREATE INDEX reels_user_id ON reels (user_id);
+
+CREATE TABLE reel_likes (
+    reel_id character(36) NOT NULL,
+    user_id character(36) NOT NULL,
+    created_at timestamp with time zone NOT NULL,
+    PRIMARY KEY (reel_id, user_id)
+);

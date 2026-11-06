@@ -21,6 +21,7 @@ const useChatMessages = (chatId) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [typing, setTyping] = useState(false);
+  const [disappearAfter, setDisappearAfter] = useState(null); // null = not known yet
 
   const showTimer = useRef(null);
   const idleTimer = useRef(null);
@@ -79,11 +80,17 @@ const useChatMessages = (chatId) => {
       if (p.chatId === chatId) setTyping(false);
     };
 
+    const onDisappear = (p) => {
+      if (p.chatId === chatId) setDisappearAfter(p.seconds);
+    };
+
+    socket.on('chat:disappear', onDisappear);
     socket.on('message:receive', onReceive);
     socket.on('typing:start', onTypingStart);
     socket.on('typing:stop', onTypingStop);
 
     return () => {
+      socket.off('chat:disappear', onDisappear);
       socket.off('message:receive', onReceive);
       socket.off('typing:start', onTypingStart);
       socket.off('typing:stop', onTypingStop);
@@ -91,6 +98,17 @@ const useChatMessages = (chatId) => {
       clearTimeout(idleTimer.current);
     };
   }, [chatId, user.id, add]);
+
+  // Drop disappearing messages from the screen as soon as they expire (the server deletes them too).
+  useEffect(() => {
+    const id = setInterval(() => {
+      const now = Date.now();
+      setMessages((prev) => (prev.some((m) => m.expires_at && new Date(m.expires_at).getTime() <= now)
+        ? prev.filter((m) => !m.expires_at || new Date(m.expires_at).getTime() > now)
+        : prev));
+    }, 5000);
+    return () => clearInterval(id);
+  }, []);
 
   const send = useCallback(
     async (text) => {
@@ -134,7 +152,7 @@ const useChatMessages = (chatId) => {
     setNextCursor(res.data.nextCursor);
   }, [chatId, nextCursor]);
 
-  return { messages, loading, error, typing, hasMore: !!nextCursor, send, notifyTyping, loadOlder };
+  return { messages, loading, error, typing, hasMore: !!nextCursor, send, notifyTyping, loadOlder, disappearAfter, setDisappearAfter };
 };
 
 export default useChatMessages;

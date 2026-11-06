@@ -904,7 +904,21 @@ All are under `/api`, authenticated with the `hr_ticket` cookie unless marked pu
 - `POST /uploads` — multipart `file` (+ optional `purpose=avatar`). Type is sniffed from the bytes; images are re-encoded to WebP with metadata stripped. Limits: image 5 MB, audio 15 MB, video 25 MB. Returns `{ url, kind }`.
 
 ### Status (24 h posts)
-- `GET /status`, `POST /status { kind: text|image|video|audio, text?, media_url? }`, `DELETE /status/:id` (own posts).
+- `GET /status?scope=all|following`, `POST /status { kind: text|image|video|audio, text?, media_url?, visibility?: public|followers }`, `DELETE /status/:id` (own posts).
+- `POST /status/:id/view` records a view; `GET /status/:id/viewers` lists viewers (author only). Own posts return `viewCount`, others return `viewed`.
+
+### Social (follow / block)
+- `POST|DELETE /social/follow/:username`, `POST|DELETE /social/block/:username`
+- `GET /social/following`, `/social/followers`, `/social/blocked`, `/social/relationship/:username`
+- Blocking removes follows both ways and hides each side from the other (messages, stories, reels, search, nearby).
+
+### Reels
+- `GET /reels?scope=all|following&cursor=`, `POST /reels { video_url, caption?, visibility? }`, `DELETE /reels/:id`
+- `POST|DELETE /reels/:id/like`
+
+### Chat privacy
+- `PATCH /chats/:chatId/disappear { seconds: 0|3600|86400|604800 }` (applies to new messages; socket event `chat:disappear`).
+- `PATCH /settings { read_receipts: bool, who_can_message: everyone|following }`.
 
 ### Threads
 - `GET /threads?cursor` → `{ threads, nextCursor }`, `GET /threads/:id` (includes `replies`), `POST /threads { title 3–150, body 3–3000 }`, `POST /threads/:id/replies { body 1–2000 }`, `DELETE /threads/:id` (author only).

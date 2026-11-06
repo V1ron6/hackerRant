@@ -21,6 +21,8 @@ const Message = sequelize.define('Message', {
     type:      DataTypes.TEXT,
     allowNull: false,
   },
+  // Set when the chat has disappearing messages on; purged after this time.
+  expires_at: DataTypes.DATE,
 }, {
   tableName:  'messages',
   timestamps: true,

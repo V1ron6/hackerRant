@@ -3,11 +3,12 @@ import { Link, NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import Avatar from './Avatar.jsx';
 import AggressorWidget from './AggressorWidget.jsx';
-import { MessageCircle, CircleDot, MessagesSquare, Search, Library, UserRound, Settings, ShieldAlert, LogOut, Radio } from 'lucide-react';
+import { MessageCircle, CircleDot, MessagesSquare, Search, Library, UserRound, Settings, ShieldAlert, LogOut, Radio, Clapperboard } from 'lucide-react';
 
 const items = [
   { to: '/app', label: 'Chats', icon: MessageCircle, end: true },
   { to: '/app/status', label: 'Status', icon: CircleDot },
+  { to: '/app/reels', label: 'Reels', icon: Clapperboard },
   { to: '/app/threads', label: 'Threads', icon: MessagesSquare },
   { to: '/app/rantfinder', label: 'RantFinder', icon: Search },
   { to: '/app/ranres', label: 'Ranres', icon: Library },

@@ -1,9 +1,14 @@
 const { v4: uuidv4 } = require('uuid');
 const { QueryTypes, Op } = require('sequelize');
 const { sequelize, User, Chat, ChatMember, Message } = require('../models');
+const rel      = require('./relations.service');
+const settingsService = require('./settings.service');
 
 const MAX_TEXT  = 4000;
 const PAGE_SIZE = 30;
+
+// Allowed disappearing-message timers in seconds (0 = off): 1 hour, 1 day, 1 week.
+exports.DISAPPEAR_OPTIONS = [0, 3600, 86400, 604800];
 
 const httpError = (status, message) => Object.assign(new Error(message), { status });
 
@@ -13,6 +18,7 @@ const toMessage = (m) => ({
   senderId:   m.sender_id,
   text:       m.text,
   created_at: m.created_at,
+  expires_at: m.expires_at || null,
 });
 
 // Throws 404 (not 403) so chat ids can't be probed by non-members.
@@ -26,6 +32,16 @@ const memberIds = async (chatId) =>
   (await ChatMember.findAll({ where: { chat_id: chatId }, attributes: ['user_id'] }))
     .map((m) => m.user_id);
 exports.memberIds = memberIds;
+
+// Block + privacy rules shared by "start a chat" and "send a message".
+// `sender` writes to `recipientId`. Same message for both cases so a block isn't revealed.
+const assertCanMessage = async (senderId, recipientId) => {
+  if (await rel.isBlocked(senderId, recipientId)) throw httpError(403, 'You cannot message this user');
+  const theirs = await settingsService.load(recipientId);
+  if (theirs.who_can_message === 'following' && !(await rel.isFollowing(recipientId, senderId))) {
+    throw httpError(403, 'This user only accepts messages from people they follow');
+  }
+};
 
 // ─── Create (or return the existing) DM with another user ────────────────────
 exports.createDm = async (me, username) => {
@@ -43,6 +59,8 @@ exports.createDm = async (me, username) => {
     const existing = await Chat.findOne({ where: { dm_key: dmKey }, transaction: t });
     if (existing) return [existing, false];
 
+    await assertCanMessage(me.id, other.id);
+
     const chat = await Chat.create({ id: uuidv4(), dm_key: dmKey }, { transaction: t });
     await ChatMember.bulkCreate(
       [me.id, other.id].map((user_id) => ({ chat_id: chat.id, user_id })),
@@ -51,25 +69,27 @@ exports.createDm = async (me, username) => {
     return [chat, true];
   });
 
-  return { created: createdNow, chat: { id: chat.id, type: chat.type, title: `@${other.username}` } };
+  return { created: createdNow, chat: { id: chat.id, type: chat.type, title: `@${other.username}`, disappearAfter: chat.disappear_after || 0 } };
 };
 
 // ─── List my chats with counterpart, last message and unread count ───────────
 exports.listChats = async (userId) => {
   const rows = await sequelize.query(
-    `SELECT c.id, c.type,
+    `SELECT c.id, c.type, c.disappear_after,
             u.username AS other_username, u.avatar_url AS other_avatar,
             lm.id AS last_id, lm.text AS last_text, lm.created_at AS last_at, lm.sender_id AS last_sender,
             (SELECT COUNT(*) FROM messages m
                WHERE m.chat_id = c.id AND m.sender_id <> :userId
-                 AND m.created_at > me.last_read_at) AS unread
+                 AND m.created_at > me.last_read_at
+                 AND (m.expires_at IS NULL OR m.expires_at > NOW())) AS unread
        FROM chat_members me
        JOIN chats c         ON c.id = me.chat_id
        JOIN chat_members om ON om.chat_id = c.id AND om.user_id <> :userId
        JOIN users u         ON u.id = om.user_id
        LEFT JOIN LATERAL (
          SELECT id, text, created_at, sender_id FROM messages
-          WHERE chat_id = c.id ORDER BY created_at DESC LIMIT 1
+          WHERE chat_id = c.id AND (expires_at IS NULL OR expires_at > NOW())
+          ORDER BY created_at DESC LIMIT 1
        ) lm ON TRUE
       WHERE me.user_id = :userId
       ORDER BY COALESCE(lm.created_at, c.created_at) DESC`,
@@ -81,6 +101,7 @@ exports.listChats = async (userId) => {
     type:   r.type,
     title:  `@${r.other_username}`,
     avatar: r.other_avatar,
+    disappearAfter: r.disappear_after || 0,
     lastMessage: r.last_id
       ? { id: r.last_id, text: r.last_text, senderId: r.last_sender, created_at: r.last_at }
       : null,
@@ -93,7 +114,10 @@ exports.listMessages = async (userId, chatId, { cursor, limit }) => {
   await exports.assertMember(userId, chatId);
 
   const take  = Math.min(Math.max(parseInt(limit, 10) || PAGE_SIZE, 1), 100);
-  const where = { chat_id: chatId };
+  const where = {
+    chat_id: chatId,
+    [Op.or]: [{ expires_at: null }, { expires_at: { [Op.gt]: new Date() } }],
+  };
   if (cursor) where.created_at = { [Op.lt]: new Date(cursor) };
 
   const rows = await Message.findAll({
@@ -119,7 +143,13 @@ exports.sendMessage = async (userId, chatId, rawText) => {
 
   await exports.assertMember(userId, chatId);
 
-  const msg     = await Message.create({ id: uuidv4(), chat_id: chatId, sender_id: userId, text });
+  const others = (await memberIds(chatId)).filter((id) => id !== userId);
+  for (const id of others) await assertCanMessage(userId, id);
+
+  const chat      = await Chat.findByPk(chatId, { attributes: ['disappear_after'] });
+  const expiresAt = chat?.disappear_after ? new Date(Date.now() + chat.disappear_after * 1000) : null;
+
+  const msg     = await Message.create({ id: uuidv4(), chat_id: chatId, sender_id: userId, text, expires_at: expiresAt });
   const payload = toMessage(msg);
 
   try {
@@ -140,6 +170,9 @@ exports.markRead = async (userId, chatId) => {
     { where: { chat_id: chatId, user_id: userId } }
   );
 
+  // Unread counts always update; the other side is only told if I have read receipts on.
+  if (!(await settingsService.load(userId)).read_receipts) return;
+
   try {
     const io = require('../sockets').getIO();
     for (const id of await memberIds(chatId)) {
@@ -147,3 +180,22 @@ exports.markRead = async (userId, chatId) => {
     }
   } catch { /* sockets not initialised */ }
 };
+
+// ─── Disappearing messages: applies to messages sent after the change ────────
+exports.setDisappear = async (userId, chatId, seconds) => {
+  const secs = Number(seconds);
+  if (!exports.DISAPPEAR_OPTIONS.includes(secs)) throw httpError(400, 'Invalid timer');
+  await exports.assertMember(userId, chatId);
+  await Chat.update({ disappear_after: secs || null }, { where: { id: chatId } });
+
+  try {
+    const io = require('../sockets').getIO();
+    for (const id of await memberIds(chatId)) io.to(id).emit('chat:disappear', { chatId, seconds: secs, by: userId });
+  } catch { /* sockets not initialised */ }
+
+  return { chatId, disappearAfter: secs };
+};
+
+// Housekeeping: delete messages past their expiry.
+exports.purgeExpired = () =>
+  Message.destroy({ where: { expires_at: { [Op.lt]: new Date() } } });

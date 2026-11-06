@@ -23,6 +23,11 @@ router.post('/:chatId/messages',
   body('text').isString().withMessage('text is required'),
   ban, chatCtrl.send);
 
+router.patch('/:chatId/disappear',
+  merlin.verifyToken, chatId,
+  body('seconds').isInt({ min: 0 }).toInt().withMessage('seconds is required'),
+  ban, chatCtrl.disappear);
+
 router.post('/:chatId/read', merlin.verifyToken, chatId, ban, chatCtrl.read);
 
 module.exports = router;

@@ -9,7 +9,7 @@ import { getSocket } from '../services/socket.js';
 import { useAuth } from './AuthContext.jsx';
 
 const SettingsContext = createContext(null);
-const DEFAULTS = { notifications: true, chat_theme: 'default', share_location: false };
+const DEFAULTS = { notifications: true, chat_theme: 'default', share_location: false, read_receipts: true, who_can_message: 'everyone' };
 
 export const SettingsProvider = ({ children }) => {
   const { user } = useAuth();

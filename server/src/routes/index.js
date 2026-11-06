@@ -14,5 +14,7 @@ router.use('/status',   require('./status.routes'));
 router.use('/threads',  require('./thread.routes'));
 router.use('/resources', require('./resource.routes'));
 router.use('/complaints', require('./complaint.routes'));
+router.use('/social',   require('./social.routes'));
+router.use('/reels',    require('./reel.routes'));
 
 module.exports = router;

@@ -39,3 +39,10 @@ exports.read = async (req, res, next) => {
     return ok(res, {}, 'Marked read');
   } catch (err) { next(err); }
 };
+
+// PATCH /api/chats/:chatId/disappear   { seconds }  (0 = off)
+exports.disappear = async (req, res, next) => {
+  try {
+    return ok(res, await chatService.setDisappear(req.user.id, req.params.chatId, req.body.seconds), 'Timer updated');
+  } catch (err) { next(err); }
+};

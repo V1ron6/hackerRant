@@ -1,9 +1,9 @@
 /** Chat detail (route: /app/chat/:chatId) — realtime conversation with one user. */
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Timer } from 'lucide-react';
 import useChatMessages from '../../hooks/useChatMessages.js';
-import { chatService } from '../../services/api.js';
+import { chatService, getErrorMessage } from '../../services/api.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import MessageBubble from '../../components/chat/MessageBubble.jsx';
 import MessageComposer from '../../components/chat/MessageComposer.jsx';
@@ -14,7 +14,7 @@ const Chat = () => {
   const { chatId } = useParams();
   const location = useLocation();
   const { user } = useAuth();
-  const { messages, loading, error, typing, hasMore, send, notifyTyping, loadOlder } =
+  const { messages, loading, error, typing, hasMore, send, notifyTyping, loadOlder, disappearAfter, setDisappearAfter } =
     useChatMessages(chatId);
 
   // The messages endpoint has no chat meta; the list passes the title via router state.
@@ -26,6 +26,26 @@ const Chat = () => {
       .then((res) => setTitle(res.data.find((c) => c.id === chatId)?.title || 'Chat'))
       .catch(() => setTitle('Chat'));
   }, [chatId, title]);
+
+  // Current disappearing-message timer (the live socket event keeps it fresh after this).
+  useEffect(() => {
+    chatService
+      .list()
+      .then((res) => setDisappearAfter(res.data.find((c) => c.id === chatId)?.disappearAfter || 0))
+      .catch(() => setDisappearAfter(0));
+  }, [chatId, setDisappearAfter]);
+
+  const [timerErr, setTimerErr] = useState('');
+  const changeTimer = async (e) => {
+    const seconds = Number(e.target.value);
+    setTimerErr('');
+    try {
+      await chatService.setDisappear(chatId, seconds);
+      setDisappearAfter(seconds);
+    } catch (err) {
+      setTimerErr(getErrorMessage(err));
+    }
+  };
 
   const listRef = useRef(null);
   const stickToBottom = useRef(true);
@@ -62,7 +82,19 @@ const Chat = () => {
         ) : (
           <h1 className="prefFont min-w-0 truncate text-lg font-extrabold">{title || '…'}</h1>
         )}
+        <label className="ml-auto flex shrink-0 items-center gap-1.5 text-xs text-gray-400" title="Disappearing messages">
+          <Timer size={14} className={disappearAfter ? 'text-red-400' : ''} />
+          <span className="sr-only">Disappearing messages</span>
+          <select value={disappearAfter ?? 0} onChange={changeTimer} disabled={disappearAfter === null}
+            className="rounded-md border bg-transparent px-1.5 py-1 text-xs outline-none focus:border-red-400/60">
+            <option value={0}>Off</option>
+            <option value={3600}>1 hour</option>
+            <option value={86400}>1 day</option>
+            <option value={604800}>1 week</option>
+          </select>
+        </label>
       </div>
+      {timerErr ? <p role="alert" className="pt-2 text-xs !text-red-400">{timerErr}</p> : null}
 
       <div ref={listRef} onScroll={onScroll} className="flex-1 space-y-2 overflow-y-auto py-4">
         {loading ? (

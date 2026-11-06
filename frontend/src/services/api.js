@@ -300,6 +300,10 @@ export const chatService = {
   send: (chatId, text) =>
     apiCall(`/chats/${encodeURIComponent(chatId)}/messages`, { method: 'POST', body: { text } }),
 
+  /** PATCH /chats/:chatId/disappear — seconds: 0 (off) | 3600 | 86400 | 604800 */
+  setDisappear: (chatId, seconds) =>
+    apiCall(`/chats/${encodeURIComponent(chatId)}/disappear`, { method: 'PATCH', body: { seconds } }),
+
   /** POST /chats/:chatId/read */
   markRead: (chatId) =>
     apiCall(`/chats/${encodeURIComponent(chatId)}/read`, { method: 'POST', body: {} }),
@@ -336,9 +340,36 @@ export const uploadService = {
 
 /** /status — 24h posts */
 export const statusService = {
-  list: () => apiCall('/status'),
+  /** scope: 'all' (default) | 'following' */
+  list: (scope) => apiCall(`/status${qs({ scope })}`),
   create: (payload) => apiCall('/status', { method: 'POST', body: payload }),
   remove: (id) => apiCall(`/status/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  /** POST /status/:id/view — record that I saw someone's story */
+  view: (id) => apiCall(`/status/${encodeURIComponent(id)}/view`, { method: 'POST', body: {} }),
+  /** GET /status/:id/viewers — author only */
+  viewers: (id) => apiCall(`/status/${encodeURIComponent(id)}/viewers`),
+};
+
+/** /social — follow (subscribe) and block */
+export const socialService = {
+  relationship: (username) => apiCall(`/social/relationship/${encodeURIComponent(username)}`),
+  follow: (username) => apiCall(`/social/follow/${encodeURIComponent(username)}`, { method: 'POST', body: {} }),
+  unfollow: (username) => apiCall(`/social/follow/${encodeURIComponent(username)}`, { method: 'DELETE' }),
+  block: (username) => apiCall(`/social/block/${encodeURIComponent(username)}`, { method: 'POST', body: {} }),
+  unblock: (username) => apiCall(`/social/block/${encodeURIComponent(username)}`, { method: 'DELETE' }),
+  blocked: () => apiCall('/social/blocked'),
+  following: () => apiCall('/social/following'),
+  followers: () => apiCall('/social/followers'),
+};
+
+/** /reels — short vertical videos */
+export const reelService = {
+  /** scope: 'all' | 'following'; cursor = nextCursor from the previous page */
+  feed: ({ scope, cursor } = {}) => apiCall(`/reels${qs({ scope, cursor })}`),
+  create: (payload) => apiCall('/reels', { method: 'POST', body: payload }),
+  remove: (id) => apiCall(`/reels/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  like: (id) => apiCall(`/reels/${encodeURIComponent(id)}/like`, { method: 'POST', body: {} }),
+  unlike: (id) => apiCall(`/reels/${encodeURIComponent(id)}/like`, { method: 'DELETE' }),
 };
 
 /** /threads */

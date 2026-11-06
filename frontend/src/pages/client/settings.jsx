@@ -1,9 +1,9 @@
 /** Settings (route: /app/settings) — preferences, devices, and account actions. */
 import { useState } from 'react';
-import { Bell, KeyRound, LogOut, MapPin, MonitorSmartphone, Palette, Settings as SettingsIcon, Trash2 } from 'lucide-react';
+import { Bell, KeyRound, LogOut, MapPin, MonitorSmartphone, Palette, Settings as SettingsIcon, ShieldCheck, Trash2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useSettings } from '../../context/SettingsContext.jsx';
-import { authService, clearSessionHint, getErrorMessage, sessionService, userService } from '../../services/api.js';
+import { authService, clearSessionHint, getErrorMessage, sessionService, socialService, userService } from '../../services/api.js';
 import { closeSocket } from '../../services/socket.js';
 import { CHAT_THEMES } from '../../utils/chatThemes.js';
 import useLoad from '../../hooks/useLoad.js';
@@ -46,6 +46,7 @@ const Settings = () => {
   const [password, setPassword] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const sessions = useLoad(async () => (await sessionService.getSessions()).data, []);
+  const blocked = useLoad(async () => (await socialService.blocked()).data, []);
 
   const say = (tone, text) => setMsg({ tone, text });
   const run = async (key, fn, okText) => {
@@ -84,6 +85,11 @@ const Settings = () => {
       { timeout: 10000 }
     );
   }), 'Location updated (rounded to roughly 1 km).');
+
+  const unblock = (username) => run(`b-${username}`, async () => {
+    await socialService.unblock(username);
+    await blocked.reload();
+  }, `Unblocked @${username}.`);
 
   const endLocalSession = () => { clearSessionHint(); closeSocket(); setUser(null); };
 
@@ -131,6 +137,35 @@ const Settings = () => {
             </button>
           ))}
         </div>
+      </Section>
+
+      <Section icon={ShieldCheck} title="Privacy">
+        <Row title="Read receipts" desc="Let people know when you've read their messages. If you turn this off you won't see theirs either.">
+          <Toggle checked={settings.read_receipts} onChange={(on) => run('rr', () => update({ read_receipts: on }))} label="Read receipts" disabled={busy === 'rr'} />
+        </Row>
+        <div className="my-3 h-px bg-white/10" />
+        <Row title="Who can message me" desc="'People I follow' blocks new messages from everyone else.">
+          <select value={settings.who_can_message} onChange={(e) => run('wcm', () => update({ who_can_message: e.target.value }))} disabled={busy === 'wcm'}
+            aria-label="Who can message me" className="shrink-0 rounded-lg border px-3 py-2 text-sm outline-none focus:border-red-400/60 disabled:opacity-60">
+            <option value="everyone">Everyone</option>
+            <option value="following">People I follow</option>
+          </select>
+        </Row>
+        <div className="my-3 h-px bg-white/10" />
+        <div className="text-sm font-semibold text-gray-100">Blocked people</div>
+        {blocked.loading ? <p className="mt-2 text-sm">Loading…</p> : blocked.error ? <Notice tone="error" className="mt-2">{blocked.error}</Notice> : (blocked.data || []).length === 0 ? (
+          <p className="mt-1 text-xs">You haven't blocked anyone.</p>
+        ) : (
+          <ul className="mt-2 space-y-2">
+            {blocked.data.map((u) => (
+              <li key={u.username} className="flex items-center justify-between gap-3 rounded-xl border border-white/10 px-3 py-2">
+                <span className="truncate text-sm text-gray-100">@{u.username}</span>
+                <button type="button" onClick={() => unblock(u.username)} disabled={busy === `b-${u.username}`}
+                  className="shrink-0 rounded-lg border border-white/10 px-3 py-1.5 text-xs text-gray-300 disabled:opacity-60">Unblock</button>
+              </li>
+            ))}
+          </ul>
+        )}
       </Section>
 
       <Section icon={MapPin} title="Location">

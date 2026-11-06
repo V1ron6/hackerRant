@@ -10,6 +10,7 @@ export const ROUTES = {
   app: '/app',
   chats: '/app',
   status: '/app/status',
+  reels: '/app/reels',
   threads: '/app/threads',
   rantFinder: '/app/rantfinder',
   ranres: '/app/ranres',

@@ -2,18 +2,21 @@ const { Op, QueryTypes } = require('sequelize');
 const { sequelize, User } = require('../models');
 const settingsService     = require('./settings.service');
 const httpError           = require('../utils/httpError');
+const rel                 = require('./relations.service');
 
 // ─── Username prefix search ──────────────────────────────────────────────────
 exports.search = async (meId, q) => {
   const term = String(q || '').toLowerCase().replace(/[^a-z0-9_]/g, ''); // also neutralises LIKE wildcards
   if (term.length < 2) throw httpError(400, 'Type at least 2 characters');
 
+  const hidden = await rel.blockedEitherWay(meId);
+
   return User.findAll({
     where: {
       username:       { [Op.like]: `${term}%` },
       status:         'active',
       email_verified: true,
-      id:             { [Op.ne]: meId },
+      id:             { [Op.notIn]: [meId, ...hidden] },
     },
     attributes: ['username', 'first_name', 'last_name', 'avatar_url'],
     order:      [['username', 'ASC']],
@@ -31,6 +34,8 @@ exports.nearby = async (me, lat, lng, radiusKm) => {
   const dLat = radiusKm / 111;
   const dLng = radiusKm / (111 * Math.max(Math.cos((lat * Math.PI) / 180), 0.01));
 
+  const hidden = await rel.blockedEitherWay(me.id);
+
   const rows = await sequelize.query(
     `SELECT * FROM (
        SELECT u.username, u.first_name, u.last_name, u.avatar_url,
@@ -42,6 +47,7 @@ exports.nearby = async (me, lat, lng, radiusKm) => {
         WHERE s.share_location = TRUE
           AND u.status = 'active' AND u.email_verified = TRUE
           AND u.id <> :me
+          AND u.id NOT IN (:hidden)
           AND u.latitude  BETWEEN :minLat AND :maxLat
           AND u.longitude BETWEEN :minLng AND :maxLng
      ) t
@@ -51,7 +57,7 @@ exports.nearby = async (me, lat, lng, radiusKm) => {
     {
       type: QueryTypes.SELECT,
       replacements: {
-        me: me.id, lat, lng, radius: radiusKm,
+        me: me.id, hidden: hidden.length ? hidden : [''], lat, lng, radius: radiusKm,
         minLat: lat - dLat, maxLat: lat + dLat,
         minLng: lng - dLng, maxLng: lng + dLng,
       },

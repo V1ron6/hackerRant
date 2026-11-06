@@ -17,6 +17,7 @@ const Home =lazy(()=>import('./pages/Home'))
 const ChatHome = lazy(() => import('./pages/client/Homefeed.jsx'));
 const ChatDetail = lazy(() => import('./pages/client/Chat.jsx'));
 const Status = lazy(() => import('./pages/client/Status.jsx'));
+const Reels = lazy(() => import('./pages/client/Reels.jsx'));
 const Threads = lazy(() => import('./pages/client/Threads.jsx'));
 const RantFinder = lazy(() => import('./pages/client/RantFinder.jsx'));
 const Ranres = lazy(() => import('./pages/client/Ranres.jsx'));
@@ -59,6 +60,7 @@ const router = createBrowserRouter([
           { index: true, element: <Suspended><ChatHome /></Suspended> },
           { path: 'chat/:chatId', element: <Suspended><ChatDetail /></Suspended> },
           { path: 'status', element: <Suspended><Status /></Suspended> },
+          { path: 'reels', element: <Suspended><Reels /></Suspended> },
           { path: 'threads', element: <Suspended><Threads /></Suspended> },
           { path: 'threads/:id', element: <Suspended><ThreadDetail /></Suspended> },
           { path: 'u/:username', element: <Suspended><PublicProfile /></Suspended> },

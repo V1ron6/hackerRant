@@ -22,6 +22,14 @@ initSockets(server);
 
     await seedIfEmpty();
 
+    // Disappearing messages and 24h stories: sweep expired rows every minute.
+    const chatService   = require('./src/services/chat.service');
+    const statusService = require('./src/services/status.service');
+    const sweep = () => Promise.all([chatService.purgeExpired(), statusService.purgeExpired()])
+      .catch((e) => console.error('Purge failed:', e.message));
+    sweep();
+    setInterval(sweep, 60 * 1000).unref();
+
     // Run the BullMQ email worker inside this process (one Render service
     // instead of two). Leave unset and use `npm run worker` to run it separately.
     if (process.env.RUN_EMAIL_WORKER === 'true') {
